@@ -5,39 +5,34 @@ using System.Collections.Generic;
 public class CubicTerrainGenerator : MonoBehaviour
 {
 
+    //A default unity 1x1x1 cube should be put in here
     public GameObject cube;
+    //The material you want the cubes to have
     public Material material;
 
     //Noise settings. A higher frq will create larger scale details. Each seed value will create a unique look
+    //P.S. Mountains seem to be broken, working on trying to get them fixed
     public int m_groundSeed = 0;
     public float m_groundFrq = 800.0f;
     public int m_mountainSeed = 1;
     public float m_mountainFrq = 1200.0f;
 
-    //Terrain settings
-    public int m_tilesX = 1; //Number of terrain tiles on the x axis
-    public int m_tilesZ = 1; //Number of terrain tiles on the z axis
+    //Chunk/Terrain settings
+    public int m_tilesX = 2; //Number of chuncks on the x axis
+    public int m_tilesZ = 2; //Number of chuncks on the z axis
 
-    public int m_heightMapSize = 513; //Higher number will create more detailed height maps
-    public int m_terrainSize = 2048;
-    public int m_terrainHeight = 512;
+    public int m_heightMapSize = 513; //Higher number will create more detailed height maps (it will exaggerate the terrain on the Y axis)
+    public int m_terrainSize = 64; //The width and length of one "chunk"
 
     //Private
     PerlinNoise m_groundNoise, m_mountainNoise, m_treeNoise, m_detailNoise;
     Terrain[,] m_terrain;
-    SplatPrototype[] m_splatPrototypes;
     Vector2 m_offset;
 
     void Start()
     {
         m_groundNoise = new PerlinNoise(m_groundSeed);
         m_mountainNoise = new PerlinNoise(m_mountainSeed);
-
-        if (!Mathf.IsPowerOfTwo(m_heightMapSize - 1))
-        {
-            Debug.Log("TerrianGenerator::Start - height map size must be pow2+1 number");
-            m_heightMapSize = Mathf.ClosestPowerOfTwo(m_heightMapSize) + 1;
-        }
 
         float[,] htmap = new float[m_heightMapSize, m_heightMapSize];
 
