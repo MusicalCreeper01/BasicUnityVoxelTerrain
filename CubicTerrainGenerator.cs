@@ -4,11 +4,6 @@ using System.Collections.Generic;
 
 public class CubicTerrainGenerator : MonoBehaviour
 {
-    //If true, the script will use it's own function for creating a cube that will be like 8X faster then providing the script with a cube. Disable if you want to use your own object in the cube field for generating the terrain
-    public bool GenerateProceduralCube = true;
-
-    //A default unity 1x1x1 cube should be put in here, or any other object to be used to build the world
-    public GameObject cube;
     //The material you want the cubes to have
     public Material material;
 
@@ -42,44 +37,38 @@ public class CubicTerrainGenerator : MonoBehaviour
             {
                 FillHeights(htmap, tx, tz);
                 GameObject tile = new GameObject();
+                tile.name = tx + "x" + tz;
                 List<Mesh> meshs = new List<Mesh>();
                 for (int x = 0; x < m_heightMapSize; x++)
                 {
                     for (int z = 0; z < m_heightMapSize; z++)
                     {
-                        if (GenerateProceduralCube)
+
+                        meshs.Add(GenerateCubeMesh(x, htmap[z, x], z));
+                        if (meshs.Count > 1000)
                         {
-                            meshs.Add(GenerateCubeMesh(x, htmap[z, x], z));
-                            if (meshs.Count > 1000)
+                            foreach (Mesh mesh in CombinedMeshes(meshs))
                             {
-                                foreach (Mesh mesh in CombinedMeshes(meshs))
-                                {
-                                    GameObject o = new GameObject();
-                                    o.AddComponent<MeshFilter>().mesh = mesh;
-                                    MeshRenderer renderer = o.AddComponent<MeshRenderer>();
-                                    renderer.material = material;
-                                    o.transform.parent = tile.transform;
-                                }
-                                meshs.Clear();
+                                GameObject o = new GameObject();
+                                o.AddComponent<MeshFilter>().mesh = mesh;
+                                MeshRenderer renderer = o.AddComponent<MeshRenderer>();
+                                renderer.material = material;
+                                renderer.material.EnableKeyword("_VERTEXCOLOR");
+                                o.transform.parent = tile.transform;
                             }
-                        }
-                        else {
-                            GameObject o = Instantiate(cube, new Vector3(x, htmap[z, x], z), Quaternion.identity) as GameObject;
-                            o.transform.parent = tile.transform;
+                            meshs.Clear();
                         }
 
                     }
                 }
                 {
-                    if (GenerateProceduralCube) {
-                        foreach (Mesh mesh in CombinedMeshes(meshs))
-                        {
-                            GameObject o = new GameObject();
-                            o.AddComponent<MeshFilter>().mesh = mesh;
-                            MeshRenderer renderer = o.AddComponent<MeshRenderer>();
-                            renderer.material = material;
-                            o.transform.parent = tile.transform;
-                        }
+                    foreach (Mesh mesh in CombinedMeshes(meshs))
+                    {
+                        GameObject o = new GameObject();
+                        o.AddComponent<MeshFilter>().mesh = mesh;
+                        MeshRenderer renderer = o.AddComponent<MeshRenderer>();
+                        renderer.material = material;
+                        o.transform.parent = tile.transform;
                     }
                     meshs.Clear();
 
@@ -106,7 +95,6 @@ public class CubicTerrainGenerator : MonoBehaviour
                 float height = plain + mountains;
                 height = height * amplitude;
 
-                Debug.Log(worldPosX + "x" + worldPosZ + ":" + height);
                 htmap[z, x] = height;
             }
         }
@@ -250,8 +238,26 @@ public class CubicTerrainGenerator : MonoBehaviour
         mesh.uv = uvs;
         mesh.triangles = triangles;
 
+        Vector3[] cvertices = mesh.vertices;
+        Color[] colors = new Color[cvertices.Length];
+
+        int i = 0;
+        while (i < cvertices.Length)
+        {
+            if (i >= cvertices.Length - 4)
+                colors[i] = Color.green;
+            else
+                colors[i] = Color.yellow;
+
+            //colors[i] = new Color(Random.Range(0.0f, 1.0f), Random.Range(0.0f, 1.0f), Random.Range(0.0f, 1.0f));
+            //Debug.Log(cvertices[i].y);
+            i++;
+        }
+        mesh.colors = colors;
+
         mesh.RecalculateBounds();
         mesh.Optimize();
+
 
         return mesh;
     }
