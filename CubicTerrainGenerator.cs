@@ -21,13 +21,11 @@ public class CubicTerrainGenerator : MonoBehaviour
     public int m_tilesX = 2; //Number of chuncks on the x axis
     public int m_tilesZ = 2; //Number of chuncks on the z axis
 
-    public int m_heightMapSize = 513; //Higher number will create more detailed height maps (it will exaggerate the terrain on the Y axis)
-    public int m_terrainSize = 64; //The width and length of one "chunk"
+    public int m_heightMapSize = 513; //Higher number will create more detailed height maps
+    public int amplitude = 100; //Higher numbers with exaggerate the terrain
 
     //Private
-    PerlinNoise m_groundNoise, m_mountainNoise, m_treeNoise, m_detailNoise;
-    Terrain[,] m_terrain;
-    Vector2 m_offset;
+    PerlinNoise m_groundNoise, m_mountainNoise;
 
     void Start()
     {
@@ -35,11 +33,6 @@ public class CubicTerrainGenerator : MonoBehaviour
         m_mountainNoise = new PerlinNoise(m_mountainSeed);
 
         float[,] htmap = new float[m_heightMapSize, m_heightMapSize];
-
-        m_terrain = new Terrain[m_tilesX, m_tilesZ];
-
-        //this will center terrain at origin
-        m_offset = new Vector2(-m_terrainSize * m_tilesX * 0.5f, -m_terrainSize * m_tilesZ * 0.5f);
 
         for (int tx = 0; tx < m_tilesX; tx++)
         {
@@ -80,27 +73,30 @@ public class CubicTerrainGenerator : MonoBehaviour
                     meshs.Clear();
 
                 }
-                tile.transform.position = new Vector3(tx * m_terrainSize, 0, tz * m_terrainSize);
+                tile.transform.position = new Vector3(tx * m_heightMapSize, 0, tz * m_heightMapSize);
             }
         }
     }
 
     void FillHeights(float[,] htmap, int tileX, int tileZ)
     {
-        float ratio = (float)m_terrainSize / (float)m_heightMapSize;
 
         for (int x = 0; x < m_heightMapSize; x++)
         {
             for (int z = 0; z < m_heightMapSize; z++)
             {
-                float worldPosX = (x + tileX * (m_heightMapSize - 1)) * ratio;
-                float worldPosZ = (z + tileZ * (m_heightMapSize - 1)) * ratio;
+                float worldPosX = ((tileX * m_heightMapSize) + x) * 0.02f;
+                float worldPosZ = ((tileZ * m_heightMapSize) + z) * 0.02f;
 
                 float mountains = Mathf.Max(0.0f, m_mountainNoise.FractalNoise2D(worldPosX, worldPosZ, 6, m_mountainFrq, 0.8f));
 
                 float plain = m_groundNoise.FractalNoise2D(worldPosX, worldPosZ, 4, m_groundFrq, 0.1f) + 0.1f;
 
-                htmap[z, x] = plain + mountains;
+                float height = plain + mountains;
+                height = height * amplitude;
+
+                Debug.Log(worldPosX + "x" + worldPosZ + ":" + height);
+                htmap[z, x] = height;
             }
         }
     }
@@ -265,6 +261,7 @@ public class CubicTerrainGenerator : MonoBehaviour
             instance.transform = transform.localToWorldMatrix;
 
             combine.Add(instance);
+
 
             //Just a backup incase a mesh adds a ton of vertices, maybe over 65000 so we need to check a bit lower
             if (verts > 60000)
