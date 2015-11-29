@@ -4,8 +4,10 @@ using System.Collections.Generic;
 
 public class CubicTerrainGenerator : MonoBehaviour
 {
+    //If true, the script will use it's own function for creating a cube that will be like 8X faster then providing the script with a cube. Disable if you want to use your own object in the cube field for generating the terrain
+    public bool GenerateProceduralCube = true;
 
-    //A default unity 1x1x1 cube should be put in here
+    //A default unity 1x1x1 cube should be put in here, or any other object to be used to build the world
     public GameObject cube;
     //The material you want the cubes to have
     public Material material;
@@ -45,30 +47,39 @@ public class CubicTerrainGenerator : MonoBehaviour
                 {
                     for (int z = 0; z < m_heightMapSize; z++)
                     {
-                        meshs.Add(GenerateCubeMesh(x, htmap[z, x], z));
-                        if (meshs.Count > 1000)
+                        if (GenerateProceduralCube)
                         {
-                            foreach (Mesh mesh in CombinedMeshes(meshs))
+                            meshs.Add(GenerateCubeMesh(x, htmap[z, x], z));
+                            if (meshs.Count > 1000)
                             {
-                                GameObject o = new GameObject();
-                                o.AddComponent<MeshFilter>().mesh = mesh;
-                                MeshRenderer renderer = o.AddComponent<MeshRenderer>();
-                                renderer.material = material;
-                                o.transform.parent = tile.transform;
+                                foreach (Mesh mesh in CombinedMeshes(meshs))
+                                {
+                                    GameObject o = new GameObject();
+                                    o.AddComponent<MeshFilter>().mesh = mesh;
+                                    MeshRenderer renderer = o.AddComponent<MeshRenderer>();
+                                    renderer.material = material;
+                                    o.transform.parent = tile.transform;
+                                }
+                                meshs.Clear();
                             }
-                            meshs.Clear();
+                        }
+                        else {
+                            GameObject o = Instantiate(cube, new Vector3(x, htmap[z, x], z), Quaternion.identity) as GameObject;
+                            o.transform.parent = tile.transform;
                         }
 
                     }
                 }
                 {
-                    foreach (Mesh mesh in CombinedMeshes(meshs))
-                    {
-                        GameObject o = new GameObject();
-                        o.AddComponent<MeshFilter>().mesh = mesh;
-                        MeshRenderer renderer = o.AddComponent<MeshRenderer>();
-                        renderer.material = material;
-                        o.transform.parent = tile.transform;
+                    if (GenerateProceduralCube) {
+                        foreach (Mesh mesh in CombinedMeshes(meshs))
+                        {
+                            GameObject o = new GameObject();
+                            o.AddComponent<MeshFilter>().mesh = mesh;
+                            MeshRenderer renderer = o.AddComponent<MeshRenderer>();
+                            renderer.material = material;
+                            o.transform.parent = tile.transform;
+                        }
                     }
                     meshs.Clear();
 
