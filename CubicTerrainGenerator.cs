@@ -1,11 +1,14 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System;
 
 
 public class CubicTerrainGenerator : MonoBehaviour
 {
     //The material you want the cubes to have
     public Material material;
+
+    public bool fillGaps = true;
 
     //Noise settings. A higher frq will create larger scale details. Each seed value will create a unique look
     //P.S. Mountains seem to be broken, working on trying to get them fixed
@@ -29,53 +32,67 @@ public class CubicTerrainGenerator : MonoBehaviour
         m_groundNoise = new PerlinNoise(m_groundSeed);
         m_mountainNoise = new PerlinNoise(m_mountainSeed);
 
-        float[,] htmap = new float[m_heightMapSize, m_heightMapSize];
-
+        
         for (int tx = 0; tx < m_tilesX; tx++)
         {
             for (int tz = 0; tz < m_tilesZ; tz++)
             {
-                FillHeights(htmap, tx, tz);
-                GameObject tile = new GameObject();
-                tile.name = tx + "x" + tz;
-                List<Mesh> meshs = new List<Mesh>();
-                for (int x = 0; x < m_heightMapSize; x++)
-                {
-                    for (int z = 0; z < m_heightMapSize; z++)
-                    {
-
-                        meshs.Add(GenerateCubeMesh(x, htmap[z, x], z));
-                        if (meshs.Count > 1000)
-                        {
-                            foreach (Mesh mesh in CombinedMeshes(meshs))
-                            {
-                                GameObject o = new GameObject();
-                                o.AddComponent<MeshFilter>().mesh = mesh;
-                                MeshRenderer renderer = o.AddComponent<MeshRenderer>();
-                                renderer.material = material;
-                                renderer.material.EnableKeyword("_VERTEXCOLOR");
-                                o.transform.parent = tile.transform;
-                            }
-                            meshs.Clear();
-                        }
-
-                    }
-                }
-                {
-                    foreach (Mesh mesh in CombinedMeshes(meshs))
-                    {
-                        GameObject o = new GameObject();
-                        o.AddComponent<MeshFilter>().mesh = mesh;
-                        MeshRenderer renderer = o.AddComponent<MeshRenderer>();
-                        renderer.material = material;
-                        o.transform.parent = tile.transform;
-                    }
-                    meshs.Clear();
-
-                }
-                tile.transform.position = new Vector3(tx * m_heightMapSize, 0, tz * m_heightMapSize);
+                CreateChunk(tz, tx);
             }
         }
+    }
+
+    void CreateChunk(int tz, int tx) {
+        float[,] htmap = new float[m_heightMapSize, m_heightMapSize];
+        FillHeights(htmap, tx, tz);
+        GameObject tile = new GameObject();
+        tile.name = tx + "x" + tz;
+        List<Mesh> meshs = new List<Mesh>();
+        for (int x = 0; x < m_heightMapSize; x++)
+        {
+            for (int z = 0; z < m_heightMapSize; z++)
+            {
+                float height = htmap[z, x];
+
+                meshs.Add(GenerateCubeMesh(x, height, z));
+                if (fillGaps)
+                {
+                    float low = getLowestSurroundHeight(tx, tz, x, z);
+                    if (low != 0 && height - low > 1)
+                    {
+                        //Debug.Log(low);
+                        int low2 = (int)(height - low);
+                        for (int i = 0; i < low2; ++i)
+                            meshs.Add(GenerateCubeMesh(x, height - (i + 1), z));
+                    }
+                }
+
+            }
+        }
+        {
+            foreach (Mesh mesh in CombinedMeshes(meshs))
+            {
+                GameObject o = new GameObject();
+                o.AddComponent<MeshFilter>().mesh = mesh;
+                MeshRenderer renderer = o.AddComponent<MeshRenderer>();
+                renderer.material = material;
+                o.transform.parent = tile.transform;
+                o.AddComponent<MeshCollider>();
+            }
+            meshs.Clear();
+
+        }
+        tile.transform.position = new Vector3(tx * m_heightMapSize, 0, tz * m_heightMapSize);
+    }
+
+    float getLowestSurroundHeight(int tilex, int tilez, int x, int z)
+    {
+        float top = getHeight(tilex, tilez, x+1, z);
+        float bottom = getHeight(tilex, tilez, x - 1, z);
+        float left = getHeight(tilex, tilez, x, z - 1);
+        float right = getHeight(tilex, tilez, x, z + 1);
+
+        return Math.Min(Math.Min(top ,bottom), Math.Min(left, right));
     }
 
     void FillHeights(float[,] htmap, int tileX, int tileZ)
@@ -85,19 +102,23 @@ public class CubicTerrainGenerator : MonoBehaviour
         {
             for (int z = 0; z < m_heightMapSize; z++)
             {
-                float worldPosX = ((tileX * m_heightMapSize) + x) * 0.02f;
-                float worldPosZ = ((tileZ * m_heightMapSize) + z) * 0.02f;
-
-                float mountains = Mathf.Max(0.0f, m_mountainNoise.FractalNoise2D(worldPosX, worldPosZ, 6, m_mountainFrq, 0.8f));
-
-                float plain = m_groundNoise.FractalNoise2D(worldPosX, worldPosZ, 4, m_groundFrq, 0.1f) + 0.1f;
-
-                float height = plain + mountains;
-                height = height * amplitude;
-
-                htmap[z, x] = height;
+                htmap[z, x] = getHeight(tileX, tileZ, x, z);
             }
         }
+    }
+
+    float getHeight(int tileX, int tileZ, int x, int z) {
+        float worldPosX = ((tileX * m_heightMapSize) + x) * 0.02f;
+        float worldPosZ = ((tileZ * m_heightMapSize) + z) * 0.02f;
+
+        float mountains = Mathf.Max(0.0f, m_mountainNoise.FractalNoise2D(worldPosX, worldPosZ, 6, m_mountainFrq, 0.8f));
+
+        float plain = m_groundNoise.FractalNoise2D(worldPosX, worldPosZ, 4, m_groundFrq, 0.1f) + 0.1f;
+
+        float height = plain + mountains;
+        height = height * amplitude;
+
+        return height;
     }
 
     Mesh GenerateCubeMesh(float x, float y, float z)
@@ -207,8 +228,8 @@ public class CubicTerrainGenerator : MonoBehaviour
         int[] triangles = new int[]
     {
 			// Bottom
-			3, 1, 0,
-            3, 2, 1,			
+			//3, 1, 0,
+            //3, 2, 1,			
 			
 			// Left
 			3 + 4 * 1, 1 + 4 * 1, 0 + 4 * 1,
@@ -267,33 +288,23 @@ public class CubicTerrainGenerator : MonoBehaviour
         List<Mesh> meshs = new List<Mesh>();
 
         // combine meshes
-        int verts = 0;
         List<CombineInstance> combine = new List<CombineInstance>();
         int i = 0;
         while (i < meshObjectList.Count)
         {
-            verts = verts + meshObjectList[i].vertexCount;
             CombineInstance instance = new CombineInstance();
             instance.mesh = meshObjectList[i];
             instance.transform = transform.localToWorldMatrix;
 
             combine.Add(instance);
 
-
-            //Just a backup incase a mesh adds a ton of vertices, maybe over 65000 so we need to check a bit lower
-            if (verts > 60000)
-            {
-                Mesh combinedMesh = new Mesh();
-                combinedMesh.CombineMeshes(combine.ToArray());
-                meshs.Add(combinedMesh);
-                combine = new List<CombineInstance>();
-                verts = 0;
-            }
             i++;
         }
-        Mesh lastCombinedMesh = new Mesh();
-        lastCombinedMesh.CombineMeshes(combine.ToArray());
-        meshs.Add(lastCombinedMesh);
+
+        Mesh combinedMesh = new Mesh();
+        combinedMesh.CombineMeshes(combine.ToArray());
+        meshs.Add(combinedMesh);
+        combine = new List<CombineInstance>();
 
         return meshs.ToArray();
     }
